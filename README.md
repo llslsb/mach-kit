@@ -93,6 +93,20 @@ node serve.mjs        # 零依赖静态服务器，默认 http://127.0.0.1:8787/
 - `examples/boiler.html` 演示了"演示数据 → 可选 `/metrics` 真数据"的降级接法；
 - `examples/clock.html` 演示了"演示数据 / CSV 回放 / 手动录入（localStorage）"三源切换，健康数据全程不出本机。
 
+### 附赠：健康数据 CSV 适配（`src/health-data.mjs`）
+
+钟表屏那一套数据管线也在库里，全部**页内解析、不发任何请求**。契约格式：表头 `时间,心率,收缩压,舒张压,血氧,体温`（心率必需）。
+
+| 导出 | 干什么 |
+| --- | --- |
+| `parseHealthCSV(text)` | 严格解析契约 CSV → `{ rows, skipped }` |
+| `convertHealthText(text)` | **宽容转换**：品牌手环导出 CSV（表头别名自动识别：timestamp/heart_rate/spo2/高压低压…）与 Apple 健康 `export.xml`（HeartRate/OxygenSaturation/血压等 Record 按分钟聚合）→ 转成契约 CSV |
+| `convertHealthCSV(text, userMap?)` | CSV 专路转换；`userMap` 指定 `{字段: 列名}` 兜底手工映射 |
+| `peekCSVHead(text)` | 只取表头列名（给"列映射"兜底 UI 用） |
+| `applyRow(T, row)` / `HEALTH_SAMPLE_CSV` / `toContractCSV(rows)` | 行喂页面目标值 / 一夜示例数据 / 行集转契约 CSV |
+
+转换自带时间归一（`2026/11/12`、`2026年11月12日`、epoch 秒/毫秒 → `YYYY-MM-DD HH:MM`）与单位归位（血氧 0~1 小数 ×100、华氏转摄氏）。
+
 ## 现状与路线
 
 **v0.2 实验期。** 杠杆已验证（三台机器、其中一台零新零件）；火苗/烟囱/煤仓已按上面三条工艺升级过一轮，但整体仍未做解剖级审查——**它现在"够看"，还没到"惊艳"**。
