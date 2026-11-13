@@ -242,7 +242,7 @@ export function Tank({ x, y, w = 124, h = 204, init = 0 } = {}, m) {
   return part;
 }
 
-// 煤仓：漏斗（顶沿+中缝+铆钉）+ 深窗 + 渐变煤堆 + 底煤 + 玻璃反光（0-100 = 存量比例）
+// 煤仓：漏斗（顶沿+中缝+铆钉）+ 深窗 + 渐变煤堆 + 底煤 + 玻璃反光（0-100 = 存量比例，满仓平顶压窗沿）
 export function Bunker({ x, y, init = 0 } = {}, m) {
   const t = m.t;
   const elg = el("g", {}, m.layers.parts);
@@ -278,12 +278,25 @@ export function Bunker({ x, y, init = 0 } = {}, m) {
     el: elg,
     set(v) { this._target = Math.min(100, Math.max(0, Number(v) || 0)); },
     _apply(cur) {
-      const h = 8 + (cur / 100) * 44;
-      mound.setAttribute("d", `M${x - 52} ${base} Q${x} ${base - h} ${x + 52} ${base} Z`);
-      dots[0].setAttribute("cx", x - 22); dots[0].setAttribute("cy", base - h * .22);
-      dots[1].setAttribute("cx", x + 8);  dots[1].setAttribute("cy", base - h * .10);
-      dots[2].setAttribute("cx", x - 4);  dots[2].setAttribute("cy", base - h * .42);
-      dots[3].setAttribute("cx", x + 26); dots[3].setAttribute("cy", base - h * .28);
+      // 峰高与存量成正比：0% 也有一层底煤的鼓包，100% 顶到距窗沿 10px。
+      // 注意二次贝塞尔的实际峰顶只有控制点高度的一半，所以控制点要给 2 倍峰高。
+      const peak = 10 + (cur / 100) * 52;                 // 10..62
+      let d;
+      if (cur >= 80) {
+        // 高仓：煤压着窗沿堆平了——出现平顶，越满平顶越宽
+        const t = (cur - 80) / 20;                        // 0..1
+        const pw = 8 + t * 36;                            // 平顶半宽 8→44
+        d = `M${x - 52} ${base} Q${x - 38} ${base - peak * 1.5} ${x - pw} ${base - peak}`
+          + ` L${x + pw} ${base - peak}`
+          + ` Q${x + 38} ${base - peak * 1.5} ${x + 52} ${base} Z`;
+      } else {
+        d = `M${x - 52} ${base} Q${x} ${base - peak * 2} ${x + 52} ${base} Z`;
+      }
+      mound.setAttribute("d", d);
+      dots[0].setAttribute("cx", x - 22); dots[0].setAttribute("cy", base - peak * .45);
+      dots[1].setAttribute("cx", x + 8);  dots[1].setAttribute("cy", base - peak * .20);
+      dots[2].setAttribute("cx", x - 4);  dots[2].setAttribute("cy", base - peak * .60);
+      dots[3].setAttribute("cx", x + 26); dots[3].setAttribute("cy", base - peak * .40);
     },
   };
   part.set(init);
