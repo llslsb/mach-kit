@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>锅炉房 · 零件库样板（真数据）</title>
+<style>
+  :root { color-scheme: dark; }
+  body{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+        background:#171c23; font-family:"Microsoft YaHei","PingFang SC",sans-serif; }
+  .card{ background:#222a34; border:1px solid #39434f; border-radius:16px; padding:18px 22px 14px;
+         box-shadow:0 18px 50px rgba(0,0,0,.45); color:#cfd8e3; }
+  .head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
+  .head .fig{ font-weight:700; letter-spacing:1px; color:#e8eef5; }
+  .head .sub{ font-size:12px; color:#8fa0b3; }
+  .foot{ margin-top:6px; }
+  .row{ display:flex; justify-content:space-between; align-items:center; gap:24px; }
+  .link{ font-size:12.5px; color:#d9a53a; }
+  .hint{ font-size:11.5px; color:#66788c; margin-top:4px; }
+  .readout{ font-family:Consolas,Menlo,monospace; font-size:15px; color:#ffd28a; white-space:nowrap; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="head">
+    <span class="fig">Fig 1 · 锅炉房</span>
+    <span class="sub">mach-kit 示例 · 演示数据 / 可选真数据</span>
+  </div>
+  <div id="mount"></div>
+  <div class="foot">
+    <div class="row">
+      <span class="link" id="link">● 未连接数据插头 · 演示假数据</span>
+      <span class="readout" id="readout">CPU --% · 内存 --% · 磁盘 --% · 网络 -- MB/s</span>
+    </div>
+    <div class="hint">数据源：内置演示假数据 · 接真数据需自备 /metrics 接口（见 README） · 地址加 ?state=alarm 直接看报警演出</div>
+  </div>
+</div>
+<script type="module">
+import { Machine, Base, Plate, Stack, Lamp, Boiler, Gauge, Tank, Bunker, Belt, alarmLevel } from "../src/mach-kit.mjs";
+
+// —— 装配：全部由标准零件拼成（对照 v0.2 手写版，视觉一致） ——
+const m = new Machine({ w: 960, h: 560, theme: "dark", width: 900 });
+m.mount("#mount");
+m.create(Base, { x: 80, y: 486, w: 800 });
+const stack  = m.create(Stack,  { x: 222, y: 118 });
+const boiler = m.create(Boiler, { x: 160, y: 268, w: 160, h: 200, init: .1 });
+const gauge  = m.create(Gauge,  { x: 352, y: 300, r: 30, label: "CPU", min: 0, max: 100, init: 0 });
+const tank   = m.create(Tank,   { x: 400, y: 268, w: 124, h: 204, init: 30 });
+const bunker = m.create(Bunker, { x: 652, y: 268, init: 40 });
+const belt   = m.create(Belt,   { x1: 716, x2: 884, y: 433, init: .2 });
+const lamp   = m.create(Lamp,   { x: 101, y: 264, label: "警示灯", poleTo: 488 });
+m.create(Plate, { x: 240, y: 486, text: "锅炉 · CPU" });
+m.create(Plate, { x: 462, y: 486, text: "内存水箱" });
+m.create(Plate, { x: 652, y: 486, text: "磁盘煤仓" });
+m.create(Plate, { x: 800, y: 486, text: "网络传送带" });
+
+// —— 数据引擎：与 v0.2 相同（live 轮询 + demo 回退 + 报警演出） ——
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const rand  = (lo, hi) => lo + Math.random() * (hi - lo);
+const forceAlarm = new URLSearchParams(location.search).get("state") === "alarm";
+var T = { cpu: 42, mem: 58, disk: 52, net: 1.1 };
+var mode = "demo";
+var scripted = false;
+if (forceAlarm) { T.cpu = 97; T.mem = 70; T.disk = 62; T.net = 2.4; scripted = true; }
+
+var link = document.getElementById("link");
+function setLink(live) {
+  if (live) { link.textContent = "● 已连接真数据（数据插头 agent.mjs）"; link.style.color = "#3fae5a"; }
+  else if (forceAlarm) { link.textContent = "● 报警演出 · 演示假数据"; link.style.color = "#e2574a"; }
+  else { link.textContent = "● 未连接数据插头 · 演示假数据"; link.style.color = "#d9a53a"; }
+}
+setLink(false);
+
+function poll() {
+  if (forceAlarm) return;
+  fetch("/metrics", { cache: "no-store" }).then(function (r) {
+    if (!r.ok) throw new Error("http " + r.status);
+    return r.json();
+  }).then(function (mm) {
+    T.cpu  = clamp(Number(mm.cpu) || 0, 0, 100);
+    T.mem  = clamp(Number(mm.mem) || 0, 0, 100);
+    T.disk = clamp(Number(mm.disk) || 0, 0, 100);
+    T.net  = Math.max(0, Number(mm.net) || 0) / 1048576;
+    if (mode !== "live") { mode = "live"; setLink(true); }
+  }).catch(function () {
+    if (mode !== "demo") { mode = "demo"; setLink(false); }
+  });
+}
+setInterval(poll, 700); poll();
+
+setInterval(function () {
+  if (mode !== "demo" || scripted) return;
+  T.cpu  = clamp(T.cpu + rand(-7, 7), 16, 76);
+  T.mem  = clamp(T.mem + rand(-5, 5), 30, 78);
+  T.disk = clamp(T.disk + rand(-1.2, 1.2), 30, 88);
+  T.net  = clamp(T.net + rand(-.5, .5), .1, 4.5);
+}, 700);
+function event() {
+  setTimeout(function () {
+    if (mode === "demo" && !scripted && !forceAlarm) {
+      scripted = true;
+      var kind = Math.random() < .5 ? "cpu" : "mem";
+      if (kind === "cpu") { T.cpu = 97; setTimeout(function () { T.cpu = 44; scripted = false; }, 8000); }
+      else                { T.mem = 94; setTimeout(function () { T.mem = 58; scripted = false; }, 9000); }
+    }
+    event();
+  }, 24000 + Math.random() * 16000);
+}
+event();
+
+// —— 喂数：把目标值推进零件（库内部做缓动） ——
+var readout = document.getElementById("readout");
+function feed() {
+  const load = clamp(T.cpu / 100, 0, 1);
+  const dark = T.cpu > 90 || T.mem > 90;
+  gauge.set(T.cpu);
+  boiler.set(load);
+  tank.set(T.mem);
+  bunker.set(T.disk);
+  belt.set(T.net);
+  stack.set(load, dark);
+  lamp.set({ level: alarmLevel(Math.max(T.cpu, T.mem)), shake: T.cpu > 92 });
+  readout.textContent = "CPU " + Math.round(T.cpu) + "% · 内存 " + Math.round(T.mem)
+    + "% · 磁盘 " + Math.round(T.disk) + "% · 网络 " + T.net.toFixed(1) + " MB/s"
+    + (dark ? "　⚠ 机器过载！" : "");
+}
+setInterval(feed, 700);
+if (forceAlarm) feed();
+</script>
+</body>
+</html>

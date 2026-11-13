@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>宽带水站 · 零件库杠杆验证（全新机器）</title>
+<style>
+  :root { color-scheme: dark; }
+  body{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+        background:#171c23; font-family:"Microsoft YaHei","PingFang SC",sans-serif; }
+  .card{ background:#222a34; border:1px solid #39434f; border-radius:16px; padding:18px 22px 14px;
+         box-shadow:0 18px 50px rgba(0,0,0,.45); color:#cfd8e3; }
+  .head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
+  .head .fig{ font-weight:700; letter-spacing:1px; color:#e8eef5; }
+  .head .sub{ font-size:12px; color:#8fa0b3; }
+  .foot{ margin-top:6px; }
+  .row{ display:flex; justify-content:space-between; align-items:center; }
+  .readout{ font-family:Consolas,Menlo,monospace; font-size:15px; color:#ffd28a; white-space:nowrap; }
+  .hint{ font-size:11.5px; color:#66788c; margin-top:4px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="head">
+    <span class="fig">Fig 3 · 宽带水站</span>
+    <span class="sub">杠杆验证 · 全部由 mach-kit 现成零件拼装 · 演示假数据</span>
+  </div>
+  <div id="mount"></div>
+  <div class="foot">
+    <div class="row"><span class="readout" id="readout">延迟 -- ms · 下行 -- MB/s · 上行 -- MB/s</span></div>
+    <div class="hint">家里网线的状态：延迟是压力表（越低越好），下行/上行是两条传送带； ping 飙高或断网时警示灯报警。每 25 秒左右模拟一次网络故障</div>
+  </div>
+</div>
+<script type="module">
+import { Machine, Base, Plate, Raw, Gauge, Belt, Lamp, alarmLevel } from "../src/mach-kit.mjs";
+
+// —— 装配：零新零件，纯拼装 ——
+const m = new Machine({ w: 960, h: 540, theme: "dark", width: 900 });
+m.mount("#mount");
+m.create(Base, { x: 120, y: 430, w: 800 });
+// 路由器机箱 + 两根天线（结构性的边角料走 Raw 逃生舱）
+m.create(Raw, { build: (g, m) => {
+  const t = m.t;
+  const box = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  box.setAttribute("x", 190); box.setAttribute("y", 240); box.setAttribute("width", 140); box.setAttribute("height", 150);
+  box.setAttribute("rx", 10); box.setAttribute("fill", m.grad("steel")); box.setAttribute("stroke", t.leg); box.setAttribute("stroke-width", 2);
+  g.appendChild(box);
+  [[225, "up"], [295, "up"]].forEach(([ax]) => {
+    const a = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    a.setAttribute("x1", ax); a.setAttribute("y1", 240); a.setAttribute("x2", ax - 14); a.setAttribute("y2", 190);
+    a.setAttribute("stroke", t.darkB); a.setAttribute("stroke-width", 5); a.setAttribute("stroke-linecap", "round");
+    g.appendChild(a);
+  });
+  [[225, 300, t.ok], [250, 300, t.warn], [275, 300, t.alarm]].forEach(([cx, cy, col]) => {
+    const d = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    d.setAttribute("cx", cx); d.setAttribute("cy", cy); d.setAttribute("r", 5); d.setAttribute("fill", col);
+    g.appendChild(d);
+  });
+  const stub = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  stub.setAttribute("x", 248); stub.setAttribute("y", 226); stub.setAttribute("width", 24); stub.setAttribute("height", 14);
+  stub.setAttribute("fill", m.grad("steelDark"));
+  g.appendChild(stub);
+}});
+const ping = m.create(Gauge, { x: 260, y: 195, r: 34, label: "延迟ms", min: 0, max: 300, init: 0 });
+const down = m.create(Belt, { x1: 380, x2: 600, y: 398, init: 1 });
+const up   = m.create(Belt, { x1: 640, x2: 860, y: 398, init: .3 });
+const lamp = m.create(Lamp, { x: 90, y: 250, label: "宽带状态", poleTo: 452 });
+m.create(Plate, { x: 260, y: 480, text: "延迟压力表" });
+m.create(Plate, { x: 490, y: 480, text: "下行传送带" });
+m.create(Plate, { x: 750, y: 480, text: "上行传送带" });
+
+// —— 数据引擎：演示假数据（接真实宽带测速是下一阶段的事） ——
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const rand = (lo, hi) => lo + Math.random() * (hi - lo);
+const T = { ping: 24, down: 6, up: 1.2 };
+const forceAlarm = new URLSearchParams(location.search).get("state") === "alarm";
+let scripted = false;
+if (forceAlarm) { T.ping = 300; T.down = 0; T.up = 0; scripted = true; }
+setInterval(function () {
+  if (scripted) return;
+  T.ping = clamp(T.ping + rand(-8, 8), 12, 80);
+  T.down = clamp(T.down + rand(-1, 1), .5, 12);
+  T.up = clamp(T.up + rand(-.3, .3), .2, 3);
+}, 700);
+function event() {
+  setTimeout(function () {
+    if (!scripted) {
+      scripted = true;
+      if (Math.random() < .5) { T.ping = 220; setTimeout(function () { T.ping = 26; scripted = false; }, 8000); }
+      else { T.down = 0; T.up = 0; T.ping = 300; setTimeout(function () { T.down = 6; T.up = 1.2; T.ping = 24; scripted = false; }, 6000); }
+    }
+    event();
+  }, 18000 + Math.random() * 12000);
+}
+event();
+
+const readout = document.getElementById("readout");
+function feed() {
+  const level = alarmLevel(T.ping, { yellow: 120, red: 200 });
+  ping.set(T.ping);
+  down.set(T.down);
+  up.set(T.up);
+  lamp.set({ level });
+  readout.textContent = "延迟 " + Math.round(T.ping) + " ms · 下行 " + T.down.toFixed(1)
+    + " MB/s · 上行 " + T.up.toFixed(1) + " MB/s" + (level === 2 ? "　⚠ 网络异常！" : "");
+}
+setInterval(feed, 700);
+feed();
+</script>
+</body>
+</html>

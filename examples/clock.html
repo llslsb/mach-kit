@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>家用钟表屏 · 零件库样板（暖木主题）</title>
+<style>
+  body{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+        background:#efe6d6; font-family:"Microsoft YaHei","PingFang SC",sans-serif; }
+  .card{ background:#f8f3e9; border:1px solid #d8c9ae; border-radius:18px; padding:18px 22px 14px;
+         box-shadow:0 16px 44px rgba(96,72,40,.22); color:#5b4632; }
+  .head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+  .head .fig{ font-weight:700; letter-spacing:1px; color:#4a3823; }
+  .head .sub{ font-size:12px; color:#9a8563; }
+  .foot{ display:flex; flex-direction:column; gap:4px; margin-top:6px; }
+  .readout{ font-size:21px; font-weight:700; color:#4a3823; letter-spacing:.5px; white-space:nowrap; }
+  .readout .warn{ color:#c0392b; }
+  .hint{ font-size:12px; color:#9a8563; }
+  /* —— 数据源控制条 —— */
+  .controls{ margin-top:12px; display:flex; flex-direction:column; gap:8px; }
+  .modes{ display:flex; gap:8px; }
+  .modes button, .panel button{ padding:6px 14px; border-radius:8px; border:1px solid #d8c9ae; background:#f1e6cf;
+        color:#5b4632; cursor:pointer; font-family:inherit; font-size:12.5px; }
+  .modes button.on{ background:#4a3823; color:#f8f3e9; border-color:#4a3823; font-weight:700; }
+  .panel{ display:none; border:1px dashed #d8c9ae; border-radius:10px; padding:10px 12px; font-size:12.5px; color:#6b5a42; }
+  .panel.show{ display:flex; flex-direction:column; gap:8px; }
+  .panel textarea{ width:100%; height:88px; box-sizing:border-box; border:1px solid #d8c9ae; border-radius:8px;
+        padding:8px; font-family:Consolas,Menlo,monospace; font-size:12px; color:#4a3823; background:#fdf8ec; resize:vertical; }
+  .panel .fields{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .panel label{ display:flex; align-items:center; gap:4px; }
+  .panel input[type=number]{ width:72px; padding:4px 6px; border:1px solid #d8c9ae; border-radius:6px;
+        background:#fdf8ec; color:#4a3823; font-family:inherit; }
+  .panel .btns{ display:flex; gap:8px; flex-wrap:wrap; }
+  .status{ color:#9a8563; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="head">
+    <span class="fig">Fig 2 · 家用钟表屏</span>
+    <span class="sub">mach-kit 零件库样板 · 暖木主题 · 数据不出本机</span>
+  </div>
+  <div id="mount"></div>
+  <div class="foot">
+    <div class="readout" id="readout">心率 -- 次/分　血压 --/--　血氧 --%　体温 --℃</div>
+    <div class="hint" id="modeHint">当前数据源：演示假数据 · 每 40 秒左右模拟一次夜间异常 · ?state=alarm 直接看报警</div>
+  </div>
+  <div class="controls">
+    <div class="modes">
+      <button id="modeDemo" class="on">演示假数据</button>
+      <button id="modeCsv">CSV 回放</button>
+      <button id="modeManual">手动录入</button>
+    </div>
+    <div class="panel" id="panelCsv">
+      <textarea id="csvText" placeholder="粘贴健康数据 CSV（表头：时间,心率,收缩压,舒张压,血氧,体温）——数据只在本页解析，不出本机"></textarea>
+      <div class="btns">
+        <button id="parseCsv">解析并载入</button>
+        <button id="togglePlay">回放 ▶</button>
+        <button id="dlSample">下载示例CSV</button>
+      </div>
+      <span class="status" id="csvStatus">尚未载入。手环/手表导出的记录整理成上面的列名即可播放。</span>
+    </div>
+    <div class="panel" id="panelManual">
+      <div class="fields">
+        <label>心率 <input id="mHr" type="number" value="72"> 次/分</label>
+        <label>收缩压 <input id="mSys" type="number" value="118"></label>
+        <label>舒张压 <input id="mDia" type="number" value="76"></label>
+        <label>血氧 <input id="mSpo2" type="number" value="98"> %</label>
+        <label>体温 <input id="mTemp" type="number" value="36.6" step="0.1"> ℃</label>
+      </div>
+      <div class="btns">
+        <button id="applyManual">录入并生效</button>
+        <button id="exportCsv">导出录入记录CSV</button>
+        <button id="clearLocal">清空本地记录</button>
+      </div>
+      <span class="status" id="mStatus">血压计/指尖仪测完手工填，点「录入并生效」钟就跟着变。记录只存本机浏览器。</span>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { Machine, WoodCase, Raw, Bell, ClockFace, Banner, Pendulum, Thermo, Gauge, Flame } from "../src/mach-kit.mjs";
+import { parseHealthCSV, applyRow, HEALTH_SAMPLE_CSV } from "../src/health-data.mjs";
+
+// —— 装配（同 v0.3-draft，未变） ——
+const m = new Machine({ w: 900, h: 640, theme: "warm", width: 820 });
+m.mount("#mount");
+m.create(WoodCase, { x: 330, y: 62, w: 240, h: 528 });
+m.create(Raw, { build: (g, m) => {
+  const t = m.t;
+  const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  c.setAttribute("cx", 450); c.setAttribute("cy", 34); c.setAttribute("r", 9); c.setAttribute("fill", m.grad("brass"));
+  g.appendChild(c);
+  const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  l.setAttribute("x1", 450); l.setAttribute("y1", 43); l.setAttribute("x2", 450); l.setAttribute("y2", 58);
+  l.setAttribute("stroke", t.brassLine); l.setAttribute("stroke-width", 3);
+  g.appendChild(l);
+}});
+const bell = m.create(Bell, { x: 450, y: 74 });
+m.create(ClockFace, { x: 450, y: 196, r: 88, label: "健康守护钟" });
+const banner = m.create(Banner, { x: 372, y: 296, w: 156, h: 32, text: "一切正常" });
+m.create(Raw, { build: (g, m) => {
+  const t = m.t;
+  const mk = (tag, attrs) => { const n = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const k in attrs) n.setAttribute(k, attrs[k]); g.appendChild(n); return n; };
+  mk("rect", { x: 396, y: 340, width: 108, height: 120, rx: 14, fill: t.inner });
+  mk("rect", { x: 396, y: 340, width: 108, height: 120, rx: 14, fill: m.grad("glass"), stroke: t.brassLine, "stroke-width": 2 });
+}});
+const pend = m.create(Pendulum, { x: 450, y: 346, len: 90 });
+const thermo = m.create(Thermo, { x: 356.5, y: 332, h: 152, label: "体温" });
+const bp = m.create(Gauge, { x: 537, y: 398, r: 31, label: "血压", min: 60, max: 180, init: 60 });
+m.create(Raw, { build: (g, m) => {
+  const t = m.t;
+  const mk = (tag, attrs) => { const n = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const k in attrs) n.setAttribute(k, attrs[k]); g.appendChild(n); return n; };
+  const d = "M380 548 L380 500 Q380 468 414 468 L486 468 Q520 468 520 500 L520 548 Z";
+  mk("path", { d, fill: t.inner });
+  mk("path", { d, fill: m.grad("glass"), stroke: t.brassLine, "stroke-width": 2 });
+}});
+const flame = m.create(Flame, { x: 450, y: 548, init: 1 });
+
+// —— 数据引擎：三数据源（demo / csv / manual），feed 统一喂数 ——
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const rand = (lo, hi) => lo + Math.random() * (hi - lo);
+const forceAlarm = new URLSearchParams(location.search).get("state") === "alarm";
+const T = { hr: 72, sys: 118, dia: 76, spo2: 98, temp: 36.6 };
+let mode = "demo";
+let scripted = false;
+if (forceAlarm) { T.spo2 = 88.5; scripted = true; }
+
+const $ = (id) => document.getElementById(id);
+const modeHint = $("modeHint");
+const HINTS = {
+  demo: "当前数据源：演示假数据 · 每 40 秒左右模拟一次夜间异常 · ?state=alarm 直接看报警 · 炉火=血氧，越旺越好",
+  csv: "当前数据源：CSV 回放 · 数据只在本页解析 · 炉火=血氧，越旺越好",
+  manual: "当前数据源：手动录入 · 记录只存本机浏览器 · 炉火=血氧，越旺越好",
+};
+
+setInterval(function () {
+  if (mode !== "demo" || scripted) return;
+  T.hr = clamp(T.hr + rand(-4, 4), 62, 96);
+  T.sys = clamp(T.sys + rand(-3, 3), 105, 132);
+  T.dia = clamp(T.dia + rand(-2, 2), 70, 85);
+  T.spo2 = clamp(T.spo2 + rand(-.5, .5), 95.5, 99);
+  T.temp = clamp(T.temp + rand(-.08, .08), 36.2, 37.1);
+}, 800);
+function event() {
+  setTimeout(function () {
+    if (mode === "demo" && !scripted && !forceAlarm) {
+      scripted = true;
+      if (Math.random() < .55) { T.spo2 = 88.5; setTimeout(function () { T.spo2 = 97.5; scripted = false; }, 9000); }
+      else { T.hr = 118; setTimeout(function () { T.hr = 74; scripted = false; }, 7000); }
+    }
+    event();
+  }, 32000 + Math.random() * 18000);
+}
+event();
+
+// —— 数据源切换 ——
+const PANES = { demo: null, csv: "panelCsv", manual: "panelManual" };
+function setMode(next) {
+  mode = next;
+  for (const [key, pane] of Object.entries(PANES)) {
+    $("mode" + key[0].toUpperCase() + key.slice(1)).classList.toggle("on", key === next);
+    if (pane) $(pane).classList.toggle("show", key === next);
+  }
+  modeHint.textContent = HINTS[next];
+  if (next === "manual") feed(); // 立即反映当前输入框数值
+}
+$("modeDemo").addEventListener("click", () => setMode("demo"));
+$("modeCsv").addEventListener("click", () => setMode("csv"));
+$("modeManual").addEventListener("click", () => setMode("manual"));
+
+// —— CSV 回放 ——
+let csvRows = [], playIdx = 0, playing = false, playTimer = null;
+$("parseCsv").addEventListener("click", function () {
+  const res = parseHealthCSV($("csvText").value);
+  if (res.error) { $("csvStatus").textContent = "解析失败：" + res.error; return; }
+  if (!res.rows.length) { $("csvStatus").textContent = "没有可用的行（每行需有数字「心率」）"; return; }
+  csvRows = res.rows; playIdx = csvRows.length - 1; playing = false;
+  clearInterval(playTimer); playTimer = null;
+  $("togglePlay").textContent = "回放 ▶";
+  applyRow(T, csvRows[playIdx]);
+  $("csvStatus").textContent = "载入 " + csvRows.length + " 行（跳过 " + res.skipped + " 行）。最新："
+    + (csvRows[playIdx].time || "(无时间)") + "；点「回放」看这一夜。";
+  setMode("csv"); feed();
+});
+$("togglePlay").addEventListener("click", function () {
+  if (!csvRows.length) { $("csvStatus").textContent = "先解析 CSV 再回放。"; return; }
+  playing = !playing;
+  this.textContent = playing ? "暂停 ⏸" : "回放 ▶";
+  if (playing) {
+    playTimer = setInterval(function () {
+      playIdx = (playIdx + 1) % csvRows.length;   // 循环回放，适合挂在墙上
+      applyRow(T, csvRows[playIdx]);
+      $("csvStatus").textContent = "回放中：" + (csvRows[playIdx].time || "(无时间)")
+        + "（" + (playIdx + 1) + "/" + csvRows.length + "）";
+    }, 400);
+  } else clearInterval(playTimer);
+});
+$("dlSample").addEventListener("click", function () {
+  const blob = new Blob([HEALTH_SAMPLE_CSV], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "health-sample.csv"; a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// —— 手动录入（localStorage 持久化 + 导出） ——
+const LS_KEY = "boilerhouse-health-manual";
+const loadManual = () => { try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; } };
+const saveManual = (rows) => { try { localStorage.setItem(LS_KEY, JSON.stringify(rows)); } catch {} };
+let manualRows = loadManual();
+if (manualRows.length) $("mStatus").textContent = "本机已有 " + manualRows.length + " 条录入记录，可导出 CSV。";
+$("applyManual").addEventListener("click", function () {
+  const v = (id) => Number($(id).value);
+  T.hr = clamp(v("mHr"), 30, 220);
+  T.sys = clamp(v("mSys"), 60, 220);
+  T.dia = clamp(v("mDia"), 40, 140);
+  T.spo2 = clamp(v("mSpo2"), 70, 100);
+  T.temp = clamp(v("mTemp"), 34, 42);
+  manualRows.push({ time: new Date().toLocaleString("zh-CN", { hour12: false }), hr: T.hr, sys: T.sys, dia: T.dia, spo2: T.spo2, temp: T.temp });
+  saveManual(manualRows);
+  $("mStatus").textContent = "已生效并记录（本机共 " + manualRows.length + " 条）。";
+  setMode("manual"); feed();
+});
+$("exportCsv").addEventListener("click", function () {
+  const head = "时间,心率,收缩压,舒张压,血氧,体温";
+  const body = manualRows.map(r => [r.time, r.hr, r.sys, r.dia, r.spo2, r.temp].join(",")).join("\n");
+  const blob = new Blob([head + "\n" + body], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "health-manual.csv"; a.click();
+  URL.revokeObjectURL(a.href);
+});
+$("clearLocal").addEventListener("click", function () {
+  manualRows = []; saveManual(manualRows);
+  $("mStatus").textContent = "本机记录已清空。";
+});
+
+// —— 统一喂数（700ms，所有模式共用） ——
+const readout = document.getElementById("readout");
+function feed() {
+  const vigor = clamp((T.spo2 - 88) / 11, 0, 1);
+  let msg = null;
+  if (T.spo2 < 93) msg = "血氧偏低，请注意！";
+  else if (T.hr > 110) msg = "心跳偏快，请注意！";
+  else if (T.sys > 140) msg = "血压偏高，请注意！";
+  else if (T.temp > 37.8) msg = "体温偏高，请注意！";
+  const alarm = !!msg;
+  pend.set(T.hr);
+  bp.set(T.sys);
+  thermo.set(T.temp);
+  flame.set(vigor);
+  banner.set({ text: alarm ? msg : "一切正常", ok: !alarm });
+  bell.set({ on: alarm });
+  const w = (c) => c ? " warn" : "";
+  readout.innerHTML =
+    '<span class="' + w(T.hr > 110) + '">心率 ' + Math.round(T.hr) + ' 次/分</span>　' +
+    '<span class="' + w(T.sys > 140) + '">血压 ' + Math.round(T.sys) + '/' + Math.round(T.dia) + '</span>　' +
+    '<span class="' + w(T.spo2 < 93) + '">血氧 ' + Math.round(T.spo2) + '%</span>　' +
+    '<span class="' + w(T.temp > 37.8) + '">体温 ' + T.temp.toFixed(1) + '℃</span>' +
+    (alarm ? "　⚠ " + msg : "");
+}
+setInterval(feed, 700);
+feed();
+</script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mach-kit · 把看不见的状态拼成会动的机器</title>
+<style>
+  :root { color-scheme: dark; }
+  body{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+        background:#171c23; font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#cfd8e3; }
+  .card{ max-width:660px; background:#222a34; border:1px solid #39434f; border-radius:16px; padding:30px 36px; }
+  h1{ margin:0 0 6px; font-size:26px; color:#e8eef5; letter-spacing:1px; }
+  p.sub{ margin:0 0 22px; color:#8fa0b3; font-size:14px; }
+  ul{ margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:12px; }
+  li a{ display:block; padding:14px 18px; border:1px solid #39434f; border-radius:10px;
+        color:#ffd28a; text-decoration:none; font-size:15px; }
+  li a:hover{ background:#2a333f; }
+  li a span{ display:block; color:#8fa0b3; font-size:12.5px; margin-top:3px; }
+  .foot{ margin-top:22px; font-size:12px; color:#66788c; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>mach-kit</h1>
+  <p class="sub">把看不见的状态，拼成一台会动的机器 · 零依赖 SVG 零件库</p>
+  <ul>
+    <li><a href="examples/boiler.html">锅炉房 —— 电脑/服务器的运行状态<span>CPU 是锅炉压力表，内存是水箱水位，磁盘是煤仓，网络是传送带 · 加 ?state=alarm 看报警演出</span></a></li>
+    <li><a href="examples/clock.html">家用钟表屏 —— 健康数据的暖木挂钟<span>心率是摆锤节奏，血压是表盘，血氧是炉火 · 演示 / CSV 回放 / 手动录入，数据不出本机</span></a></li>
+    <li><a href="examples/broadband.html">宽带水站 —— 家里网线的状态<span>延迟是压力表，下行/上行是两条传送带 · 零新零件纯拼装的杠杆验证 · 加 ?state=alarm 看断网演出</span></a></li>
+  </ul>
+  <div class="foot">三个示例都内置演示数据，打开就能看 · 本页由 node serve.mjs 提供（双击 file:// 打开会被浏览器拦截 ES 模块）</div>
+</div>
+</body>
+</html>
