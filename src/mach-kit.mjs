@@ -193,9 +193,11 @@ export function Gauge({ x, y, r = 30, label = "", min = 0, max = 100, init, nums
   const elg = el("g", {}, m.layers.parts);
   el("circle", { cx: x, cy: y, r, fill: t.face, stroke: t.faceStroke, "stroke-width": 5 }, elg);
   const tg = el("g", { stroke: t.faceInk, "stroke-width": 2 }, elg);
+  // 刻度/数字与指针同一套方向约定：θ = -120 + 240·占比，方向 = (sinθ, -cosθ)
+  // （0 在左下、扫过正上方、max 在右下——经典仪表布局；v0.2.2 以前刻度环错位 90°）
   for (let i = 0; i < 8; i++) {
     const a = (-120 + i * (240 / 7)) * Math.PI / 180;
-    const c = Math.cos(a), s = Math.sin(a);
+    const c = Math.sin(a), s = -Math.cos(a);
     el("line", {
       x1: x + c * r * .9, y1: y + s * r * .9, x2: x + c * r * .7, y2: y + s * r * .7,
     }, tg);
@@ -204,7 +206,7 @@ export function Gauge({ x, y, r = 30, label = "", min = 0, max = 100, init, nums
   if (nums) {
     for (let i = 0; i <= 4; i++) {
       const a = (-120 + i * 60) * Math.PI / 180;
-      const c = Math.cos(a), s = Math.sin(a);
+      const c = Math.sin(a), s = -Math.cos(a);
       txt(elg, x + c * r * .46, y + s * r * .46 + r * .06,
           String(Math.round(min + ((max - min) * i) / 4)),
           { size: Math.max(8, r * .17), fill: t.faceInk });
