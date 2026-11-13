@@ -126,3 +126,11 @@ node serve.mjs        # 零依赖静态服务器，默认 http://127.0.0.1:8787/
 ## License
 
 [MIT](LICENSE)
+
+---
+
+<div align="center">
+
+**贯一出品 · 让机器状态一眼看懂**
+
+</div>
