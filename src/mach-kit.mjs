@@ -187,8 +187,8 @@ export function Plate({ x, y, text, size = 13, fill } = {}, m) {
   return { el: elg };
 }
 
-// 压力表：表盘 + 8 刻度 + 针（数值 0-100 缓动）
-export function Gauge({ x, y, r = 30, label = "", min = 0, max = 100, init } = {}, m) {
+// 压力表：表盘 + 8 刻度 + 针（数值 0-100 缓动）；标签在表盘上方（不压针）；nums=true 时盘面标 5 个数
+export function Gauge({ x, y, r = 30, label = "", min = 0, max = 100, init, nums = false } = {}, m) {
   const t = m.t;
   const elg = el("g", {}, m.layers.parts);
   el("circle", { cx: x, cy: y, r, fill: t.face, stroke: t.faceStroke, "stroke-width": 5 }, elg);
@@ -200,7 +200,18 @@ export function Gauge({ x, y, r = 30, label = "", min = 0, max = 100, init } = {
       x1: x + c * r * .9, y1: y + s * r * .9, x2: x + c * r * .7, y2: y + s * r * .7,
     }, tg);
   }
-  if (label) txt(elg, x, y + r * .62, label, { size: Math.max(9, r * .33), fill: t.faceInk });
+  // 数字刻度：每 1/4 量程一个数，一眼读得出读数
+  if (nums) {
+    for (let i = 0; i <= 4; i++) {
+      const a = (-120 + i * 60) * Math.PI / 180;
+      const c = Math.cos(a), s = Math.sin(a);
+      txt(elg, x + c * r * .46, y + s * r * .46 + r * .06,
+          String(Math.round(min + ((max - min) * i) / 4)),
+          { size: Math.max(8, r * .17), fill: t.faceInk });
+    }
+  }
+  // 标签在表盘上方（不在盘内压针）
+  if (label) txt(elg, x, y - r - 8, label, { size: Math.max(9, r * .33), fill: t.faceInk });
   const needle = el("path", { d: `M${x} ${y} L${x - r * .107} ${y - r * .8} L${x + r * .107} ${y - r * .8} Z`, fill: t.needle }, elg);
   el("circle", { cx: x, cy: y, r: r * .15, fill: t.hub }, elg);
   const part = {
